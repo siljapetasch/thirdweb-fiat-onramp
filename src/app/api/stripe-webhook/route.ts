@@ -8,7 +8,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 const {
-    WEBHOOK_SECRET_KEY,
     ENGINE_URL,
     ENGINE_ACCESS_TOKEN,
     NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS,
@@ -76,4 +75,6 @@ const handleChargeSucceeded = async (charge: Stripe.Charge) => {
             amount: "100"
         }
     );
+
+
 };

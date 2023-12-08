@@ -2,7 +2,7 @@
 
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { Appearance, StripeElementsOptions, loadStripe } from "@stripe/stripe-js";
-import {ConnectWallet, embeddedWallet, MetaMaskWallet, ThirdwebProvider, useAddress, useBalance, useBalanceForAddress, useContract, useTokenSupply} from "@thirdweb-dev/react";
+import { ConnectWallet, embeddedWallet, MetaMaskWallet, ThirdwebProvider, useAddress, useBalance, useBalanceForAddress, useContract, useTokenSupply } from "@thirdweb-dev/react";
 import { useState } from "react";
 
 export default function Home() {
@@ -21,8 +21,8 @@ function ClaimPage() {
   const address = useAddress();
   const [clientSecret, setClientSecret] = useState<string>("")
 
-  const {contract} = useContract(process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS, "token");
-  const { data: tokenSupplyData} = useTokenSupply(contract);
+  const { contract } = useContract(process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS, "token");
+  const { data: tokenSupplyData } = useTokenSupply(contract);
   const { data: balanceOfData } = useBalance(contract?.getAddress());
 
   if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
@@ -59,28 +59,28 @@ function ClaimPage() {
       <h1 className="text-xl">Buy FAN with Credit Card</h1>
       <ConnectWallet theme={"light"} />
       <div>
-      <p>Your Balance: {balanceOfData?.displayValue.toString()} {balanceOfData?.symbol}</p>
-      <p>Total Supply: {tokenSupplyData?.displayValue.toString()} {tokenSupplyData?.symbol}</p>
+        <p>Your Balance: {balanceOfData?.displayValue.toString()} {balanceOfData?.symbol}</p>
+        <p>Total Supply: {tokenSupplyData?.displayValue.toString()} {tokenSupplyData?.symbol}</p>
       </div>
       {!clientSecret ? (
-            <button
-              className="bg-[#112D4E] hover:bg-[#3F72AF] text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 disabled:opacity-50"
-              onClick={onClick}
-              disabled={!address}
-            >
-              Buy Tokens
-            </button>
-          ) : (
-            <Elements
-              options={{
-                clientSecret,
-                appearance: { theme: "night" },
-              }}
-              stripe={stripe}
-            >
-              <CreditCardForm />
-            </Elements>
-          )}
+        <button
+          className="bg-[#112D4E] hover:bg-[#3F72AF] text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 disabled:opacity-50"
+          onClick={onClick}
+          disabled={!address}
+        >
+          Buy Tokens
+        </button>
+      ) : (
+        <Elements
+          options={{
+            clientSecret,
+            appearance: { theme: "night" },
+          }}
+          stripe={stripe}
+        >
+          <CreditCardForm />
+        </Elements>
+      )}
     </main>
   )
 }
@@ -88,15 +88,20 @@ function ClaimPage() {
 const CreditCardForm = () => {
   const elements = useElements();
   const stripe = useStripe();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
+  const { contract } = useContract(process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS, "token");
+  const address = useAddress();
+
+  type formStatus = "inital" | "paymentRequested" | "paymentConfirmed" | "tokensMinted";
+
+  const [status, setStatus] = useState<formStatus>("inital");
+  const [txHash, setTxHash] = useState("");
 
   const onClick = async () => {
     if (!stripe || !elements) {
       return;
     }
 
-    setIsLoading(true);
+    setStatus("paymentRequested")
 
     try {
       const { paymentIntent, error } = await stripe.confirmPayment({
@@ -110,34 +115,57 @@ const CreditCardForm = () => {
         throw error.message;
       }
       if (paymentIntent.status === "succeeded") {
-        setIsCompleted(true);
+        setStatus("paymentConfirmed")
+
+        console.log("Waiting for minting")
+
+        const unsubscribe = contract?.events.addEventListener(
+          "TokensMinted",
+          (event) => {
+            console.log("minted", event);
+            if (event.data.mintedTo == address) {
+              setStatus("tokensMinted");
+              setTxHash(event.transaction.transactionHash);
+            }
+
+          },
+        );
+
+        setTimeout(() => { unsubscribe && unsubscribe() }, 30000);
+
       } else {
         alert("Payment failed. Please try again.");
       }
     } catch (e) {
       alert(`There was an error with the payment. ${e}`);
+      setStatus("inital")
     }
 
-    setIsLoading(false);
   };
 
   return (
     <>
-    {!isCompleted ?
-    <>
-      <PaymentElement />
+      {(status == "inital" || status == "paymentRequested") &&
+        <>
+          <PaymentElement />
 
-      <button
-        className= "bg-[#112D4E] hover:bg-[#3F72AF] text-white font-bold py-2 px-4 rounded-lg"
-        onClick={onClick}
-        disabled={isLoading || isCompleted || !stripe || !elements}
-      >
-        {isLoading
-          ? "Please wait..."
-          : "Pay now"}
-      </button>
-      </>
-    : <p className="font-semibold text-lg">Thank you for your payment. You will receive your Tokens shortly.</p>}
+          <button
+            className="bg-[#112D4E] hover:bg-[#3F72AF] text-white font-bold py-2 px-4 rounded-lg"
+            onClick={onClick}
+            disabled={status !== "inital"}
+          >
+            {status == "inital" && "Pay now"}
+            {status == "paymentRequested" && "Processing your request"}
+          </button>
+        </>}
+
+      {status == "paymentConfirmed" &&
+        <p className="font-semibold text-lg">Thank you for your payment. You will receive your Tokens shortly.</p>
+      }
+
+      {status == "tokensMinted" &&
+        <p className="font-semibold text-lg">You have received your Tokens.<br /> View your transaction here:<a href={`https://testnet.snowtrace.io/tx/${txHash}?chainId=43113`}>Snowtrace</a></p>
+      }
     </>
   );
 };
