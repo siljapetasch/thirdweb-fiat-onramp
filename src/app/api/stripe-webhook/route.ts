@@ -52,12 +52,15 @@ const handleChargeSucceeded = async (charge: Stripe.Charge) => {
         !NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS ||
         !BACKEND_WALLET_ADDRESS
     ) {
+        console.log("Param missing");
         throw 'Server misconfigured. Did you forget to add a ".env.local" file?';
     }
 
     const { buyerWalletAddress } = charge.metadata;
     if (!buyerWalletAddress) {
+        console.log("Buyer Wallet address missing");
         throw 'Webhook metadata is missing "buyerWalletAddress".';
+
     }
 
     // Mint a 100 tokens to the buyer with Engine.
@@ -65,6 +68,8 @@ const handleChargeSucceeded = async (charge: Stripe.Charge) => {
         url: ENGINE_URL,
         accessToken: ENGINE_ACCESS_TOKEN,
     });
+
+    console.log("Call engine to mint Token");
 
     await engine.erc20.mintTo(
         "avalanche-fuji",

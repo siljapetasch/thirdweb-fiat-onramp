@@ -91,7 +91,7 @@ const CreditCardForm = () => {
   const { contract } = useContract(process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS, "token");
   const address = useAddress();
 
-  type formStatus = "inital" | "paymentRequested" | "paymentConfirmed" | "tokensMinted";
+  type formStatus = "inital" | "paymentRequested" | "paymentConfirmed" | "tokensMinted" | "processFailed";
 
   const [status, setStatus] = useState<formStatus>("inital");
   const [txHash, setTxHash] = useState("");
@@ -119,10 +119,13 @@ const CreditCardForm = () => {
 
         console.log("Waiting for minting")
 
+        // Check for an event indicating that the user received the minted tokens.
         const unsubscribe = contract?.events.addEventListener(
           "TokensMinted",
           (event) => {
             console.log("minted", event);
+
+            // Check if mintedTo adress matches our users address
             if (event.data.mintedTo == address) {
               setStatus("tokensMinted");
               setTxHash(event.transaction.transactionHash);
@@ -131,14 +134,18 @@ const CreditCardForm = () => {
           },
         );
 
-        setTimeout(() => { unsubscribe && unsubscribe() }, 30000);
+        setTimeout(() => {
+          unsubscribe!();
+          if (status != "tokensMinted") setStatus("processFailed")
+        }, 30000);
 
       } else {
         alert("Payment failed. Please try again.");
+        setStatus("processFailed");
       }
     } catch (e) {
       alert(`There was an error with the payment. ${e}`);
-      setStatus("inital")
+      setStatus("inital");
     }
 
   };
@@ -160,11 +167,15 @@ const CreditCardForm = () => {
         </>}
 
       {status == "paymentConfirmed" &&
-        <p className="font-semibold text-lg">Thank you for your payment. You will receive your Tokens shortly.</p>
+        <div className="text-center font-regular relative mb-4 block rounded-lg bg-yellow-400 p-4 text-base leading-5 text-white opacity-100">Thank you for your payment. We are minting your Tokens now. Please wait!</div>
       }
 
       {status == "tokensMinted" &&
-        <p className="font-semibold text-lg">You have received your Tokens.<br /> View your transaction here:<a href={`https://testnet.snowtrace.io/tx/${txHash}?chainId=43113`}>Snowtrace</a></p>
+        <div className="text-center font-regular relative mb-4 block rounded-lg bg-lime-500 p-4 text-base leading-5 text-white opacity-100">You have received your Tokens.<br /> View your transaction here on <a target="_blank" className="underline" href={`https://testnet.snowtrace.io/tx/${txHash}?chainId=43113`}>Snowtrace.</a></div>
+      }
+
+      {status == "processFailed" &&
+        <div className="text-center font-regular relative mb-4 block rounded-lg bg-red-500 p-4 text-base leading-5 text-white opacity-100">Ooops. Something went wrong. Please reach out to our support.</div>
       }
     </>
   );
