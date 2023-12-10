@@ -133,9 +133,11 @@ const CreditCardForm = () => {
 
           },
         );
-
+        // Listen for 30 Seconds for "TokenMinted"-Events. 
         setTimeout(() => {
           unsubscribe!();
+
+          // If no events were registered set the status to "processFailed"
           if (status != "tokensMinted") setStatus("processFailed")
         }, 30000);
 
