@@ -1,6 +1,11 @@
 # FIAT ERC20 Checkout
 A FIAT ERC20 Checkout where users can purchase ERC-20 tokens using credit cards via the Stripe CLI. The platform integrates ThirdWeb's embedded wallets and Engine.
 
+## Demo
+[Video Demo](https://streamable.com/5od1rv)
+
+
+
 ## Getting Started
 
 ### Create ERC20 Token
